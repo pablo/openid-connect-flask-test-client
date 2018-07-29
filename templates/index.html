@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}OpenID Connect Flask Test Client{% endblock %}
+
+{% block description %}Very simple OpenID Connect client example written in Flask{% endblock %}
+
+{% block head %}
+    {{ super() }}
+{% endblock %}
+
+{% block content %}
+    <h1>Simple OpenID Connect Client in Flask</h1>
+    <p class="important">
+        <a href="/secured">Click Here to go to a secure page</a>
+    </p>
+{% endblock %}

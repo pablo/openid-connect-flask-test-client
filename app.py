@@ -1,4 +1,5 @@
 from flask import Flask, session, redirect
+from config import GOOGLE_API_KEY
 
 SESSION_USER = "session.user"
 
@@ -7,7 +8,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def hello_world():
-
+    print("Using my API KEY: " + GOOGLE_API_KEY)
     return 'Hello World!'
 
 @app.route('/secured')

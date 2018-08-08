@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Authentication Successful{% endblock %}
+
+{% block head %}
+    {{ super() }}
+{% endblock %}
+
+{% block content %}
+    <h1>Authentication Failed</h1>
+    <div>
+        <div>
+            <span class="label">error: </span><span class="value">{{ error }}</span>
+        </div>
+        {%  if error_description %}
+        <div>
+            <span class="label">error_description: </span><span class="value">{{ error_description }}</span>
+        </div>
+        {% endif %}
+        {%  if state %}
+        <div>
+            <span class="label">state: </span><span class="value">{{ state }}</span>
+        </div>
+        {%  endif %}
+        {%  if error_uri %}
+            <div>
+                <span class="label">error_uri: </span><span class="value">{{ error_uri }}</span>
+                <a href="{{ error_uri }}" target="_blank">(Click Here)</a>
+            </div>
+        {%  endif %}
+    </div>
+{% endblock %}

@@ -1,18 +1,28 @@
-from flask import Flask, session, redirect
-from config import GOOGLE_API_KEY
+import os
+
 import random
 
+import jwt
+import requests
+from jwt.contrib.algorithms.pycrypto import RSAAlgorithm
+
+import config
+
 from flask import Flask, request, session, redirect, make_response, render_template
+from http import HTTPStatus
 
 from hashlib import sha256
 
-import oidc_config
-
 import urllib.parse
+
+from public_keys_helper import get_public_key
 
 SESSION_USER = "session.user"
 
 app = Flask(__name__, static_url_path='/static')
+app.secret_key = config.APP_SECRET_KEY
+
+jwt.register_algorithm('RS256', RSAAlgorithm(RSAAlgorithm.SHA256))
 
 def generate_nonce(length=8):
     """Generate pseudorandom number."""
@@ -25,22 +35,26 @@ def index():
 
 def redirect_authentication_request():
 
-    state = ""
+    # state
+    state = sha256(os.urandom(1024)).hexdigest()
+    session['state'] = state
+
+    # nonce
     nonce_cookie = generate_nonce()
     nonce = sha256(nonce_cookie.encode('utf-8')).hexdigest()
 
     redirect_url = "{}?scope={}&response_type={}&client_id={}&redirect_uri={}&state={}&nonce={}&display={}".format(
-        oidc_config.Config[oidc_config.AUTHORIZATION_ENDPOINT], # URL for redirection,
-        "openid2", #scope
+        config.AUTHORIZATION_ENDPOINT, # URL for redirection,
+        urllib.parse.quote("openid email"), #scope
         "code", # response_type
-        urllib.parse.quote(oidc_config.Config[oidc_config.CLIENT_ID]), # client_id
-        urllib.parse.quote(oidc_config.Config[oidc_config.REDIRECT_URI]), # redirect_uri
+        urllib.parse.quote(config.OIDC_CLIENT_ID), # client_id
+        urllib.parse.quote(config.REDIRECT_URI), # redirect_uri
         urllib.parse.quote(state), # state
         urllib.parse.quote(nonce), # nonce
         urllib.parse.quote("page")
     )
 
-    response = make_response(redirect(redirect_url, 302))
+    response = make_response(redirect(redirect_url, HTTPStatus.FOUND))
     response.set_cookie('nonce', nonce_cookie, httponly=True)
 
     return response
@@ -53,19 +67,73 @@ def secured_resource():
         # redirect to login
         return redirect_authentication_request()
 
+def return_error(err_code: str, state: str, http_status: int, err_description: str = None):
+    return render_template(
+        'auth_error.html',
+        error = err_code,
+        error_description = err_description,
+        state = state
+    ), http_status
+
+
 
 @app.route('/auth_result')
 def auth_result():
+    state = request.args.get('state'),
     if 'error' in request.args:
-        return render_template(
-            'auth_error.html',
-            error = request.args.get('error'),
-            error_description = request.args.get('error_description'),
-            state = request.args.get('state'),
-            error_uri = request.args.get("error_uri")
+        return return_error(
+            request.args.get('error'),
+            state,
+            HTTPStatus.UNAUTHORIZED,
+            "Server returned: {}".format(request.args.get('error_description'))
         )
     else:
-        pass
+        #session_state = session['state']
+
+        #if session_state != state:
+        if False:
+            return return_error(
+                'invalid_state',
+                state,
+                HTTPStatus.UNAUTHORIZED,
+                "State in Session is: {}".format(session_state)
+            )
+        else:
+            # exchange CODE with ACCESS TOKEN
+            code = request.args.get('code')
+            if not code:
+                return return_error('missing_parameter', state, HTTPStatus.UNAUTHORIZED, 'Missing [code] parameter')
+
+            params = {
+                "code": code,
+                "client_id": config.OIDC_CLIENT_ID,
+                "client_secret": config.OIDC_CLIENT_SECRET,
+                "redirect_uri": config.REDIRECT_URI,
+                "grant_type": "authorization_code"
+            }
+
+            try:
+                r = requests.post(config.TOKEN_EXCHANGE_ENDPOINT, data = params)
+                if r.status_code in (HTTPStatus.OK, HTTPStatus.CREATED, HTTPStatus.ACCEPTED):
+                    token_data = r.json() # access_token, id_token, expires_in, token_type, refresh_token
+                    print(token_data)
+                    jwt_id_token = token_data['id_token']
+                    h = jwt.get_unverified_header(jwt_id_token)
+                    public_key = get_public_key('google', h['kid'])
+                    jd = jwt.decode(token_data['id_token'], public_key, algorithms=[h['alg']], audience=config.OIDC_CLIENT_ID)
+                    return render_template('auth_ok.html', jwt = jd)
+                else:
+                    error_data = r.json()
+                    print(error_data)
+                    if 'error' in error_data:
+                        err_description = error_data['error']
+                    else:
+                        err_description = 'Missing error information'
+                    return return_error('invalid_status_from_token_endpoint', state, r.status_code, 'Status: {} Error: {}'.format(r.status_code, err_description))
+
+            except Exception as e:
+                print(e)
+                return return_error('unexpected_exception', state, HTTPStatus.INTERNAL_SERVER_ERROR, 'Error: {}'.format(str(e)))
 
 
 if __name__ == '__main__':

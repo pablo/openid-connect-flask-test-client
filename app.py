@@ -119,8 +119,10 @@ def auth_result():
                     print(token_data)
                     jwt_id_token = token_data['id_token']
                     h = jwt.get_unverified_header(jwt_id_token)
+                    print(h)
                     public_key = get_public_key('google', h['kid'])
                     jd = jwt.decode(token_data['id_token'], public_key, algorithms=[h['alg']], audience=config.OIDC_CLIENT_ID)
+                    print(jd)
                     return render_template('auth_ok.html', jwt = jd)
                 else:
                     error_data = r.json()

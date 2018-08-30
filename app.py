@@ -15,7 +15,7 @@ from hashlib import sha256
 
 import urllib.parse
 
-from public_keys_helper import get_public_key
+import validation_keys
 
 SESSION_USER = "session.user"
 
@@ -120,10 +120,10 @@ def auth_result():
                     jwt_id_token = token_data['id_token']
                     h = jwt.get_unverified_header(jwt_id_token)
                     print(h)
-                    public_key = get_public_key('google', h['kid'])
+                    public_key = validation_keys.get_validation_key(config.OIDC_PROVIDER, h['kid'])
                     jd = jwt.decode(token_data['id_token'], public_key, algorithms=[h['alg']], audience=config.OIDC_CLIENT_ID)
                     print(jd)
-                    return render_template('auth_ok.html', jwt = jd)
+                    return render_template('auth_ok.html', jwtok = jd)
                 else:
                     error_data = r.json()
                     print(error_data)

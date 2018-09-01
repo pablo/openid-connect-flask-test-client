@@ -12,7 +12,7 @@ def get_validation_key(provider: str, key_id: str):
             n = int.from_bytes(base64.b64decode(vk['n']), 'big')
             e = int.from_bytes(base64.b64decode(vk['e']), 'big')
             k = RSA.construct((n, e,))
-            print(k.publickey().exportKey())
+            print(str("\n".join(str(k.publickey().exportKey()).split('\\n'))))
             return k
 
     return None

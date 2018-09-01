@@ -116,8 +116,9 @@ def auth_result():
                 r = requests.post(config.TOKEN_EXCHANGE_ENDPOINT, data = params)
                 if r.status_code in (HTTPStatus.OK, HTTPStatus.CREATED, HTTPStatus.ACCEPTED):
                     token_data = r.json() # access_token, id_token, expires_in, token_type, refresh_token
-                    print(token_data)
                     jwt_id_token = token_data['id_token']
+                    jwt_access_token = token_data['access_token']
+                    print("Access Token: {}\nId Token: {}".format(jwt_access_token, jwt_id_token))
                     h = jwt.get_unverified_header(jwt_id_token)
                     print(h)
                     public_key = validation_keys.get_validation_key(config.OIDC_PROVIDER, h['kid'])
